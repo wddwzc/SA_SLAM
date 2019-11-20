@@ -220,6 +220,7 @@ void SegMapper::segMatchThread() {
 
     // Update the local map with the new points and the new pose.
 	// 更新局部地图和新的位姿点
+	
 	// 获取当前最新位姿
     Pose current_pose = incremental_estimator_->getCurrentPose(track_id);
     {
