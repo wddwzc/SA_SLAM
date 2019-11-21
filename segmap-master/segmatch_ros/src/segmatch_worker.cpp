@@ -177,6 +177,7 @@ bool SegMatchWorker::processLocalMap(
     // TODO move after optimizing and updating target map?
     if (params_.close_loops) {
       // If we did not find a loop-closure, transfer the source to the target map.
+	  // 如果没有找到闭环，将source转到targetMap
       if (recognized_matches.empty()) {
         segmatch_.transferSourceToTarget(track_id, latest_pose.time_ns);
       }
@@ -219,6 +220,7 @@ bool SegMatchWorker::processLocalMap(
   }
 }
 
+// 单个worker输入时，同下
 void SegMatchWorker::update(const Trajectory& trajectory) {
   std::vector<Trajectory> trajectories;
   trajectories.push_back(trajectory);
@@ -226,6 +228,7 @@ void SegMatchWorker::update(const Trajectory& trajectory) {
   publish();
 }
 
+// 根据所有的轨迹更新相关分割的位姿
 void SegMatchWorker::update(const std::vector<Trajectory>& trajectories) {
   segmatch_.update(trajectories);
   publish();

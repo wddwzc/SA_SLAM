@@ -31,6 +31,10 @@ class IncrementalGeometricConsistencyRecognizer : public GraphBasedGeometricCons
   /// \param predicted_matches Vector of possible correspondences between model and scene.
   /// \returns Graph encoding pairwise consistencies. Match \c predicted_matches[i] is represented
   /// by node \c i .
+  
+  // 根据提供的匹配，构建一致性图
+  // 参数：模型与场景间的可能一致性
+  // 返回：图编码的成对一致性
   ConsistencyGraph buildConsistencyGraph(const PairwiseMatches& predicted_matches) override;
 
  private:
@@ -87,6 +91,7 @@ class IncrementalGeometricConsistencyRecognizer : public GraphBasedGeometricCons
   // State of the cache.
   // 缓存状态
   std::vector<MatchCacheSlot> matches_cache_;
+  // IdPairHash是自行定义的哈希函数
   std::unordered_map<IdPair, size_t, IdPairHash> cache_slot_indices_;
 
   static constexpr size_t kNoMatchIndex_ = std::numeric_limits<size_t>::max();

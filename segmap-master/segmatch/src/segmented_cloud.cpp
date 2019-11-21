@@ -279,6 +279,8 @@ void SegmentedCloud::setTrackId(unsigned int track_id) {
   }
 }
 
+// 根据优化后的轨迹，更新分割块（点云 重构点云 质心）的位置
+// 参数：所有worker的轨迹
 void SegmentedCloud::updateSegments(const std::vector<laser_slam::Trajectory>& trajectories) {
   for (auto& id_segment: valid_segments_) {
     SE3 new_pose = trajectories.at(id_segment.second.track_id).at(id_segment.second.getLastView().timestamp_ns);

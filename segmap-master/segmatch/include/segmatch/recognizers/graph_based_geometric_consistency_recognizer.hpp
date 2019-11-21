@@ -57,6 +57,7 @@ class GraphBasedGeometricConsistencyRecognizer : public CorrespondenceRecognizer
   // 根据提供的匹配，构建一致性图
   // 参数：模型与场景间的可能一致性
   // 返回：图编码的成对一致性
+  // 实现在incremental
   virtual ConsistencyGraph buildConsistencyGraph(const PairwiseMatches& predicted_matches) = 0;
 
   // The parameters of the geometry consistency grouping.

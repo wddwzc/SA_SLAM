@@ -20,8 +20,9 @@ constexpr size_t IncrementalGeometricConsistencyRecognizer::kNoCacheSlotIndex_;
 IncrementalGeometricConsistencyRecognizer::IncrementalGeometricConsistencyRecognizer(
     const GeometricConsistencyParams& params, const float max_model_radius) noexcept
   : GraphBasedGeometricConsistencyRecognizer(params)
-  // 此处max_model_redius为50
+  // 此处max_model_radius为50
   , max_consistency_distance_(max_model_radius * 2.0 + params.resolution)
+  // max_consistency_distance_for_caching为3
   , max_consistency_distance_for_caching_(
       params.max_consistency_distance_for_caching + params.resolution)
   , half_max_consistency_distance_for_caching_(params.max_consistency_distance_for_caching * 0.5f) {
@@ -187,6 +188,7 @@ IncrementalGeometricConsistencyRecognizer::buildConsistencyGraph(
     if (cached_info_it != cache_slot_indices_.end()) {
       // If a centroid moved by more than the allowed distance, we need to invalidate the cached
       // information and threat the match as new.
+	  // 如果质心移动超过允许的距离，我们需要使缓存信息失效 和威胁比赛如新。
       if (mustRemoveFromCache(predicted_matches[i], cached_info_it->second)) {
         ++invalidated_cached_matches;
       } else {

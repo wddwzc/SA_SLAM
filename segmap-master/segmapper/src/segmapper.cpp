@@ -259,6 +259,7 @@ void SegMapper::segMatchThread() {
             " time_b_ns: " << loop_closure.time_b_ns;
 
         // Prevent the workers to process further scans (and add variables to the graph).
+		// 防止worker处理后续扫描（并向图中添加变量）
         BENCHMARK_START("SM.ProcessLoopClosure.WaitingForLockOnLaserSlamWorkers");
         for (auto& worker: laser_slam_workers_) {
           worker->setLockScanCallback(true);
@@ -266,6 +267,7 @@ void SegMapper::segMatchThread() {
         BENCHMARK_STOP("SM.ProcessLoopClosure.WaitingForLockOnLaserSlamWorkers");
 
         // Save last poses for updating the local maps.
+		// 保存最新位姿，用于更新局部地图
         BENCHMARK_START("SM.ProcessLoopClosure.GettingLastPoseOfTrajectories");
         Trajectory trajectory;
         std::vector<SE3> last_poses_before_update;
@@ -280,17 +282,20 @@ void SegMapper::segMatchThread() {
         BENCHMARK_STOP("SM.ProcessLoopClosure.GettingLastPoseOfTrajectories");
 
         BENCHMARK_START("SM.ProcessLoopClosure.UpdateIncrementalEstimator");
+		// 处理闭环，并对闭环后的轨迹进行优化
         incremental_estimator_->processLoopClosure(loop_closure);
         BENCHMARK_STOP("SM.ProcessLoopClosure.UpdateIncrementalEstimator");
 
         BENCHMARK_START("SM.ProcessLoopClosure.ProcessLocalMap");
         for (size_t i = 0u; i < laser_slam_workers_.size(); ++i) {
+		  // 此处参数为false
           if (!params_.clear_local_map_after_loop_closure) {
+			// 获取 更新前最新位姿 到 更新后最新位姿 的变换
             laser_slam::SE3 local_map_update_transform =
                 laser_slam_workers_[i]->getTransformBetweenPoses(
                     last_poses_before_update[i], last_poses_timestamp_before_update_ns[i]);
             std::unique_lock<std::mutex> map_lock2(local_maps_mutexes_[i]);
-			// 此处根据闭环的差值，对整个局部地图进行矫正？？？？？？？？？？
+			// 根据闭环优化前后的变换，对局部地图(50m半径的栅格)进行变换调整
             local_maps_[i].transform(local_map_update_transform.cast<float>());
             map_lock2.unlock();
           } else {
@@ -301,6 +306,7 @@ void SegMapper::segMatchThread() {
         }
         BENCHMARK_STOP("SM.ProcessLoopClosure.ProcessLocalMap");
 
+		// 此处得到的是activate_centroids_构成的局部地图
         MapCloud local_maps;
         for (size_t i = 0u; i < local_maps_.size(); ++i) {
           std::unique_lock<std::mutex> map_lock(local_maps_mutexes_[i]);
@@ -321,6 +327,7 @@ void SegMapper::segMatchThread() {
         }
 
         BENCHMARK_START("SM.ProcessLoopClosure.UpdateSegMatch");
+		// 根据新的轨迹，更新相关分割的关联位姿
         segmatch_worker_.update(updated_trajectories);
         BENCHMARK_STOP("SM.ProcessLoopClosure.UpdateSegMatch");
 

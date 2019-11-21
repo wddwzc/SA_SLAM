@@ -110,6 +110,7 @@ class SegMatch {
                                    laser_slam::Time timestamp_ns = 0u,
                                    laser_slam::RelativePose* loop_closure = nullptr);
 
+  // 根据优化后的轨迹，更新  segmentation_poses_  segment_cloud  maches_
   void update(const std::vector<laser_slam::Trajectory>& trajectories);
 
   /// \brief Get the internal representation of the source cloud.
@@ -245,6 +246,7 @@ class SegMatch {
   // pair contains the original and new IDs of the renamed segments.
   // 最近一次分割步骤重命名的分割块，每个pair包含原始和新的ID
   std::unordered_map<unsigned int, std::vector<std::pair<Id, Id>>> renamed_segments_;
+  // 记录最近一次处理的workerID
   unsigned int last_processed_source_cloud_ = 0u;
 
   // 定位时使用的目标点云分割
@@ -271,6 +273,7 @@ class SegMatch {
   static constexpr double kCylinderHeight_m = 40;
   static constexpr unsigned int kMaxNumberOfCloudToTransfer = 1u;
 
+  // 最大时间20s
   static constexpr laser_slam::Time kMaxTimeDiffBetweenSegmentAndPose_ns = 20000000000u;
 
 }; // class SegMatch

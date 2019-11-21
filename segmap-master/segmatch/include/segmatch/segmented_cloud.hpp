@@ -172,6 +172,8 @@ class SegmentedCloud {
 
   void setTrackId(unsigned int track_id);
 
+  // 根据优化后的轨迹，更新分割块（点云 重构点云 质心）的位置
+  // 参数：所有worker的轨迹
   void updateSegments(const std::vector<laser_slam::Trajectory>& trajectories);
 
   std::unordered_map<Id, Segment>::const_iterator begin() const {

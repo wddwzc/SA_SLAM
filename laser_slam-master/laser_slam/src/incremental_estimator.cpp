@@ -70,10 +70,13 @@ IncrementalEstimator::IncrementalEstimator(const EstimatorParams& parameters,
 void IncrementalEstimator::processLoopClosure(const RelativePose& loop_closure) {
   std::lock_guard<std::recursive_mutex> lock(full_class_mutex_);
 
-	//  ？？？？？？？？？ 此处对invalid判断
+  // 如果是同一个worker
+  // a为source，b为target
   if (loop_closure.track_id_a == loop_closure.track_id_b) {
+	// a的时间戳小于b的时间戳
     CHECK_LT(loop_closure.time_a_ns, loop_closure.time_b_ns) << "Loop closure has invalid time.";
   }
+  // 确保a、b的时间戳在对应路径上是有效的
   CHECK_GE(loop_closure.time_a_ns, laser_tracks_[loop_closure.track_id_a]->getMinTime()) <<
       "Loop closure has invalid time.";
   CHECK_LE(loop_closure.time_a_ns, laser_tracks_[loop_closure.track_id_a]->getMaxTime()) <<
@@ -125,7 +128,7 @@ void IncrementalEstimator::processLoopClosure(const RelativePose& loop_closure) 
     updated_loop_closure.T_a_b = convertTransformationMatrixToSE3(icp_solution);
   }
 
-	// 将更新的闭环变换和经验历史关系加入因子图中
+  // 将更新的闭环变换和经验历史关系加入因子图中
   LOG(INFO) << "Creating loop closure factor.";
 
   NonlinearFactorGraph new_factors, new_associations_factors;
@@ -134,7 +137,9 @@ void IncrementalEstimator::processLoopClosure(const RelativePose& loop_closure) 
   Expression<SE3> exp_T_w_a(laser_tracks_[loop_closure.track_id_a]->getValueExpression(
       updated_loop_closure.time_a_ns));
   Expression<SE3> exp_T_a_w(kindr::minimal::inverse(exp_T_w_a));
+  // exp_relative包含了里程计优化后的a_w和w_b
   Expression<SE3> exp_relative(kindr::minimal::compose(exp_T_a_w, exp_T_w_b));
+  // updated_loop_closure是
   ExpressionFactor<SE3> new_factor(loop_closure_noise_model_, updated_loop_closure.T_a_b,
                                    exp_relative);
   new_factors.push_back(new_factor);
@@ -144,7 +149,7 @@ void IncrementalEstimator::processLoopClosure(const RelativePose& loop_closure) 
 
   new_associations_factors.push_back(new_association_factor);
 
-	// 重新估计闭环轨迹
+  // 重新估计闭环轨迹
   LOG(INFO) << "Estimating the trajectories.";
   std::vector<unsigned int> affected_worker_ids;
   affected_worker_ids.push_back(loop_closure.track_id_a);
@@ -154,7 +159,7 @@ void IncrementalEstimator::processLoopClosure(const RelativePose& loop_closure) 
                                     new_values, affected_worker_ids,
                                     updated_loop_closure.time_b_ns);
 
-	// 闭环后更新轨迹
+  // 闭环后更新轨迹
   LOG(INFO) << "Updating the trajectories after LC.";
   for (auto& track: laser_tracks_) {
     track->updateFromGTSAMValues(result);

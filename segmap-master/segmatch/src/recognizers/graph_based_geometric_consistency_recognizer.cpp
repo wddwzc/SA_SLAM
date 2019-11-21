@@ -25,6 +25,7 @@ void GraphBasedGeometricConsistencyRecognizer::recognize(
   if (predicted_matches.empty()) return;
 
   // Build a graph encoding consistencies between the predicted matches.
+  // 构建一个图，用来编码预测匹配间的一致性
   ConsistencyGraph consistency_graph = buildConsistencyGraph(predicted_matches);
   BENCHMARK_RECORD_VALUE("SM.Worker.Recognition.BuildConsistencyGraph.NumConsistencies",
                          boost::num_edges(consistency_graph));

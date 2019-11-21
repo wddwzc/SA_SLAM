@@ -25,12 +25,15 @@ void GeometricConsistencyRecognizer::recognize(const PairwiseMatches& predicted_
   PointCloudPtr second_cloud(new PointCloud());
 
   // Create clouds for geometric consistency.
+  // 为 几何一致性 类 创建匹配点云
   BENCHMARK_START("SM.Worker.Recognition.SetupCorrespondences");
   for (size_t i = 0u; i < predicted_matches.size(); ++i) {
     // First centroid.
+	// 获取predicted_matches中，source的质心
     PclPoint first_centroid = predicted_matches.at(i).getCentroids().first;
     first_cloud->push_back(first_centroid);
     // Second centroid.
+	// 获取predicted_matches中，target的质心
     PclPoint second_centroid = predicted_matches.at(i).getCentroids().second;
     second_cloud->push_back(second_centroid);
 	// 匹配距离与置信度成反比
@@ -56,6 +59,7 @@ void GeometricConsistencyRecognizer::recognize(const PairwiseMatches& predicted_
   // 设置预计算好的input和scene之间的对应关系
   geometric_consistency_grouping.setModelSceneCorrespondences(correspondences);
   // 在场景中识别模型实例 对应转换 聚类对应关系
+  // 结合空间关系和特征距离聚类？？？？？？？？？？？
   geometric_consistency_grouping.recognize(correspondence_transformations, clustered_corrs);
   BENCHMARK_STOP("SM.Worker.Recognition.GCG");
 
@@ -67,21 +71,26 @@ void GeometricConsistencyRecognizer::recognize(const PairwiseMatches& predicted_
 	// 按聚类规模降序排列索引
     std::vector<size_t> ordered_indices(clustered_corrs.size());
 	// 0赋值给第一个元素，之后每个元素自加赋值
+	// 按照clustered_corrs降序顺序排列
     std::iota(ordered_indices.begin(), ordered_indices.end(), 0u);
     std::sort(ordered_indices.begin(), ordered_indices.end(), [&](const size_t i, const size_t j) {
       return clustered_corrs[i].size() > clustered_corrs[j].size();
     });
 
     candidate_transfomations_.resize(correspondence_transformations.size());
+	// transform(begin, end, target, op)
+	// 将op应用于[begin, end]，并将返回值置于target起始的区域
     std::transform(ordered_indices.begin(), ordered_indices.end(),
                    candidate_transfomations_.begin(), [&](const size_t i) {
                      return correspondence_transformations[i];
                    });
 
+	// 一些于source相似的场景应该都会分别聚类，然后成为候选
+	// 此处的最下聚类尺寸为100
     for (const auto& cluster : clustered_corrs) {
       // Catch the cases when PCL returns clusters smaller than the minimum cluster size.
       if (cluster.size() >= params_.min_cluster_size) {
-		  // 添加空元素？
+		// 添加空元素？
         candidate_matches_.emplace_back();
         // Create pairwise matches
         for (size_t i = 0u; i < cluster.size(); ++i) {

@@ -208,7 +208,7 @@ PairwiseMatches SegMatch::findMatches(PairwiseMatches* matches_after_first_stage
   return candidates;
 }
 
-// 获取最近点的时间
+// 获取分割质心均值，最近位姿点的时间戳
 Time findTimeOfClosestPose(const Trajectory& poses,
                            std::vector<Segment>& segments) {
   CHECK(!poses.empty());
@@ -304,6 +304,9 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
 
   // Assume that the matches in the first cluster are true positives. Return in case recognition
   // was unsuccessful.
+  
+  // 假设第一个聚类就是真阳性
+  // 聚类按照clustered_corrs的值进行了降序排序
   const std::vector<PairwiseMatches>& candidate_clusters =
       recognizer->getCandidateClusters();
   if (candidate_clusters.empty()) {
@@ -327,9 +330,11 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
     std::vector<Id> target_track_ids;
     std::vector<Segment> source_segments;
     std::vector<Segment> target_segments;
+	// 记录匹配的分割块信息，和worker的id
     for (const auto& match : last_filtered_matches_) {
       Segment segment;
       CHECK(segmented_source_clouds_[track_id].findValidSegmentById(match.ids_.first, &segment));
+	  // 找到时间窗口（60s）中距离segment最近的路径点，返回时间
       source_segmentation_times.push_back(findTimeOfClosestSegmentationPose(segment));
       source_segments.push_back(segment);
       source_track_ids.push_back(segment.track_id);
@@ -340,22 +345,23 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
       target_track_ids.push_back(segment.track_id);
     }
 
-	// 找到出现次数最多的ID，即两个ID间的回环关系
+	// 找到出现次数最多的worker ID，即两个ID间的回环关系
     const Id source_track_id = findMostOccuringElement(source_track_ids);
     const Id target_track_id = findMostOccuringElement(target_track_ids);
     LOG(INFO) << "Found a loop between source_track_id " << source_track_id << " target_track_id " <<
         target_track_id;
 
-	// 找到目标分割出现次数最多的时间点
+	// 找到目标分割出现次数最多的时间点，从而能找到对应的位姿
     const Time target_most_occuring_time = findMostOccuringElement(target_segmentation_times);
 
     Time source_track_time_ns, target_track_time_ns;
-	// 如果源ID和目标ID不一致
+	// 如果源workerID和目标workerID不一致
     if (source_track_id != target_track_id) {
       // Get the head of the source trajectory.
       Time trajectory_last_time_ns = segmentation_poses_[source_track_id].rbegin()->first;
       Time start_time_of_head_ns;
 
+	  // 此处参数为60s
       if (trajectory_last_time_ns > params_.min_time_between_segment_for_matches_ns) {
         start_time_of_head_ns = trajectory_last_time_ns - params_.min_time_between_segment_for_matches_ns;
       } else {
@@ -371,7 +377,8 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
       }
 
       // Get a window over the target trajectory.
-	  // 再目标轨迹上设置一个窗口（时间的滑动窗口，限制检索范围）
+	  // 在目标轨迹上设置一个窗口（时间的滑动窗口，限制检索范围）
+	  // 180s
       const Time half_window_size_ns = 180000000000u;
       const Time window_max_value_ns = target_most_occuring_time + half_window_size_ns;
       Time window_min_value_ns;
@@ -393,6 +400,8 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
           segments_center.z /= double(target_segments.size());
 
           // Check that pose lies below the segments center of mass.
+		  // 检测位姿是否在分割快中心以下
+		  // 该参数为false
           if (!params_.check_pose_lies_below_segments ||
               pose.second.getPosition()(2) < segments_center.z) {
             poses_in_window.emplace(pose.first, pose.second);
@@ -400,10 +409,18 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
         }
       }
 
+	  // 以上截止此处的处理
+	  // 通过时间窗口，截取位姿路径点，分别为head_poses和poses_in_window
+	  // source_segments和target_segments为候选中的source和target
+	  
+	  // 找到距离segments质心均值最近的位姿，返回对应时间戳
       source_track_time_ns =  findTimeOfClosestPose(head_poses, source_segments);
       target_track_time_ns =  findTimeOfClosestPose(poses_in_window, target_segments);
     } else {
+	// 如果源workerID和目标workerID一致
       // Split the trajectory into head and tail.
+	  // 根据一个时间阈值，将位姿分为了head和tail两部分
+	  // 源分割在head中搜索，目标分割在tail中搜索
       Time trajectory_last_time_ns = segmentation_poses_[source_track_id].rbegin()->first;
       CHECK_GT(trajectory_last_time_ns, params_.min_time_between_segment_for_matches_ns);
       Time start_time_of_head_ns = trajectory_last_time_ns -
@@ -442,18 +459,19 @@ const PairwiseMatches& SegMatch::recognize(const PairwiseMatches& predicted_matc
   return last_filtered_matches_;
 }
 
+// 根据优化后的轨迹，更新  segmentation_poses_  segment_cloud  maches_
 void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
   BENCHMARK_BLOCK("SM.Update");
   CHECK_EQ(trajectories.size(), segmentation_poses_.size());
   // Update the segmentation positions.
-  // 更新分割的位置
+  // 更新分割块关联的位置
   for (size_t i = 0u; i < trajectories.size(); ++i) {
     for (auto& pose: segmentation_poses_[i]){
       pose.second = trajectories.at(i).at(pose.first);
     }
   }
   // Update the source, target and clouds in the buffer.
-  // 更新缓冲的源 目标 点云
+  // 根据新的轨迹，更新segmented_cloud的空间位置
   for (auto& source_cloud: segmented_source_clouds_) {
     source_cloud.second.updateSegments(trajectories);
   }
@@ -463,6 +481,7 @@ void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
   }
 
   // Update the last filtered matches.
+  // 更新最新的经过滤波的匹配，需要和已更新的segment_cloud保持一致
   for (auto& match : last_filtered_matches_) {
     Segment segment;
     // TODO Replaced the CHECK with a if. How should we handle the case
@@ -477,6 +496,7 @@ void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
     }
   }
 
+  // last_predicted_matches_同上
   for (auto& match : last_predicted_matches_) {
     Segment segment;
     if (segmented_source_clouds_[last_processed_source_cloud_].
@@ -490,6 +510,8 @@ void SegMatch::update(const std::vector<laser_slam::Trajectory>& trajectories) {
   }
 
   // Filter duplicates.
+  // 此处为什么要在进行一次滤波？？？？？？？？？？？？？？？？？？？
+  // 应该是把source更新到了target？？？？？？？？？？？？？
   LOG(INFO) << "Removing too near segments from target map.";
   filterNearestSegmentsInCloud(segmented_target_cloud_, params_.centroid_distance_threshold_m,
                                5u);
@@ -633,10 +655,13 @@ void SegMatch::getLatestMatch(int64_t* time_a, int64_t* time_b,
 }
 
 // 找到满足时间约束的最近分割块的路径点（返回时间）
+// 参数：Segment
 Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
   const Time segment_time_ns = segment.getLastView().timestamp_ns;
 
   // Create the time window for which to consider poses.
+  // 创建考虑位姿的时间窗口
+  // 以segment_time_ns为中间时间，min和max分别增减20s
   Time min_time_ns;
   if (segment_time_ns < kMaxTimeDiffBetweenSegmentAndPose_ns) {
     min_time_ns = 0u;
@@ -647,6 +672,8 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
 
   // Create a point cloud of segmentation poses which fall within a time window
   // for the track associated to the segment.
+  
+  // 创建一个点云，包含时间窗口内分割块关联的位姿
   PointCloud pose_cloud;
   std::vector<Time> pose_times;
   for (const auto& pose: segmentation_poses_.at(segment.track_id)) {
@@ -660,6 +687,7 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
   CHECK_GT(pose_times.size(), 0u);
 
   // Find the nearest pose to the segment within that window.
+  // 找到时间窗口中离segment最近的路径点
   pcl::KdTreeFLANN<PclPoint> kd_tree;
   PointCloudPtr pose_cloud_ptr(new PointCloud);
   pcl::copyPointCloud(pose_cloud, *pose_cloud_ptr);
@@ -679,6 +707,7 @@ Time SegMatch::findTimeOfClosestSegmentationPose(const Segment& segment) const {
 }
 
 // 对齐目标地图
+// 保证它们的质心一致（我觉得应该就是一致的）？？？？？？
 void SegMatch::alignTargetMap() {
   segmented_source_clouds_[last_processed_source_cloud_].transform(last_transformation_.inverse());
 
@@ -686,6 +715,7 @@ void SegMatch::alignTargetMap() {
   classifier_->setTarget(segmented_target_cloud_);
 
   // Update the last filtered matches.
+  // 
   for (auto& match: last_filtered_matches_) {
     Segment segment;
     CHECK(segmented_source_clouds_.at(last_processed_source_cloud_).

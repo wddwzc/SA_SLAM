@@ -39,8 +39,10 @@ class SegMatchWorker {
       unsigned int track_id = 0u,
       laser_slam::RelativePose* loop_closure = NULL);
 
+  // 通过调用如下重载，实现
   void update(const laser_slam::Trajectory& trajectory);
 
+  // 根据所有的轨迹更新相关分割的位姿
   void update(const std::vector<laser_slam::Trajectory>& trajectories);
 
   void saveTimings() const {
