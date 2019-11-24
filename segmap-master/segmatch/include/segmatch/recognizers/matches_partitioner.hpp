@@ -24,7 +24,7 @@ class MatchesGridPartitioning {
   /// \brief Initializes a new instance of the MatchesGridPartitioning class.
   /// \param width Number of partitions on the x axis of the grid.
   /// \param height Number of partitions on the y axis of the grid.
-  // 初始化 widht 分割在栅格上的x坐标 height 分割在栅格上的y坐标
+  // 初始化 width 分割在栅格上的x坐标 height 分割在栅格上的y坐标
   explicit MatchesGridPartitioning(const size_t width = 0u, const size_t height = 0u)
     : width_(width), height_(height), partitions_(width * height) { }
 
@@ -73,7 +73,7 @@ class MatchesPartitioner {
   /// \return The computed partitioning. Every partition stores the indices in the passed matches
   /// vector of the matches it contains and custom partition data.
   // 将给定的匹配集划分到一个由平方细分组成的网格中
-  // 参数：需要被分割的匹配  栅格中一个分割的尺寸
+  // 参数：需要被分区的匹配  栅格中一个分区的尺寸
   // 返回：得到的分割  每个分割存储在输入vector中的匹配索引和分割数据
   template <typename PartitionData>
   static MatchesGridPartitioning<PartitionData> computeGridPartitioning(
