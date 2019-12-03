@@ -78,18 +78,28 @@ class IncrementalSegmenter : public Segmenter<ClusteredPointT> {
   typedef uint32_t ClusterId;
 
   // Helper data structures for discovering and linking partial clusters.
+  // 用于发现和链接部分集群的辅助数据结构
   struct PartialClustersSet {
+	// 聚类id
     ClusterId cluster_id = kUnassignedClusterId;
+	// 分割id
     Id segment_id = kNoId;
+	// 与该聚类关联的其它部分聚类的索引
+	// 由于是增量式的分割，为了同一区域的反复遍历，就会出现
+	// 同一个分割被分成了多个聚类块，各个块之间需要通过索引序列记录
     std::unordered_set<size_t> partial_clusters_indices;
   };
   typedef std::shared_ptr<PartialClustersSet> PartialClustersSetPtr;
 
+  // 部分聚类
   struct PartialCluster {
     PartialCluster() : partial_clusters_set(new PartialClustersSet()) { }
+	// 在当前聚类中的点云索引
     std::vector<size_t> point_indices;
+	// 局部聚类集合
     PartialClustersSetPtr partial_clusters_set;
   };
+  // 聚类序列
   typedef std::vector<PartialCluster> PartialClusters;
 
   // Determine the ID of a segment created by the merging of segments with IDs \c id_1 and \c id_2.

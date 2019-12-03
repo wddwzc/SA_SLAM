@@ -37,7 +37,6 @@ void SegMatch::init(const SegMatchParams& params,
   CorrespondenceRecognizerFactory recognizer_factory(params);
   // 分割器
   SegmenterFactory segmenter_factory(params);
-
   // 描述子
   descriptors_ = std::unique_ptr<Descriptors>(new Descriptors(params.descriptors_params));
   // 分割器

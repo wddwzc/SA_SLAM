@@ -311,7 +311,7 @@ Id SegmentedCloud::addSegment(const pcl::PointIndices& segment_to_add,
   }
 
   // Copy points into segment.
-  // 以上指示添加或拷贝一个segment的索引信息，此处为拷贝点云
+  // 以上只是添加或拷贝一个segment的索引信息，此处为拷贝点云
   segment.getLastView().point_cloud.clear();
   segment.getLastView().point_cloud.reserve(segment_to_add.indices.size());
   
